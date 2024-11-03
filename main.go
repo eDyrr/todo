@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
 
@@ -22,16 +23,27 @@ type Task struct {
 }
 
 func init() {
-	tmpl, _ = template.ParseGlob("templates/*.html")
+	var err error
+	tmpl, err = template.ParseGlob("./*.html")
+	if err != nil {
+		log.Fatalf("Error parsing templates: %v", err)
+	}
 }
 
 func initDB() {
+	dbUser := "root"             // Replace with your MySQL username
+	dbPassword := "eDyrr7355608" // Replace with your MySQL password
+	dbName := "testdb"           // Replace with your database name
+	dbHost := "127.0.0.1"        // Or the host of your MySQL server, if remote
+
+	// Database connection string
+	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s", dbUser, dbPassword, dbHost, dbName)
+
+	// Open database connection
 	var err error
-
-	db, err = sql.Open("mysql", "root:root@(localhost:3333)/testdb?parseTime=true")
-
+	db, err = sql.Open("mysql", dsn)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error opening database: %v", err)
 	}
 
 	if err = db.Ping(); err != nil {
@@ -59,7 +71,7 @@ func main() {
 
 	gRouter.HandleFunc("/tasks/{id}", deleteTask).Methods("DELETE")
 
-	http.ListenAndServe(":4000", gRouter)
+	log.Fatal(http.ListenAndServe(":4000", gRouter))
 }
 
 func Homepage(w http.ResponseWriter, r *http.Request) {
@@ -116,6 +128,8 @@ func getUpdateTaskForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateTask(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("update func called")
 	vars := mux.Vars(r)
 
 	taskItem := r.FormValue("task")
@@ -218,24 +232,22 @@ func getTaskByID(db *sql.DB, id int) (*Task, error) {
 }
 
 func updateTaskById(db *sql.DB, task Task) error {
-	query := "UPDATE tasks SET task = ?, done = ?, WHERE id = ?"
+	query := "UPDATE Tasks SET task = ?, done = ? WHERE id = ?"
 
 	result, err := db.Exec(query, task.Task, task.Done, task.Id)
-
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to execute update query: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
-
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve affected rows: %w", err)
 	}
 
 	if rowsAffected == 0 {
-		fmt.Println("no rows updated")
+		log.Println("no rows updated")
 	} else {
-		fmt.Printf("%d row(s) updated\n", rowsAffected)
+		log.Printf("%d row(s) updated\n", rowsAffected)
 	}
 
 	return nil
